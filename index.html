@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Face Tracking & Registration</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        /* 기존의 편안한 색상 테마 및 기본 초기화 유지 */
+        :root {
+            --bg-color: #1e272e;
+            --panel-bg: #2c3e50;
+            --text-color: #ecf0f1;
+            --btn-color: #3498db;
+            --btn-hover: #2980b9;
+            --btn-active: #e67e22;
+            --danger-color: #e74c3c;
+            --box-color: #00d2d3; 
+            --success-color: #2ecc71;
+        }
+        body {
+            margin: 0; 
+            padding: 10px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .mobile-container {
+            background-color: var(--panel-bg);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .menu-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .menu-bar.bottom {
+            margin-bottom: 0;
+            margin-top: 10px;
+            border-bottom: none;
+            border-top: 1px solid #34495e;
+            padding-top: 10px;
+        }
+        
+        button {
+            background-color: var(--btn-color);
+            color: white;
+            border: none;
+            padding: 12px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            font-size: 14px;
+            flex: 1;
+            min-width: 80px;
+        }
+        button:hover:not(:disabled) { background-color: var(--btn-hover); }
+        button:disabled { background-color: #7f8c8d; cursor: not-allowed; opacity: 0.6; }
+        button.active { background-color: var(--btn-active); }
+        button.danger { background-color: var(--danger-color); }
+
+        .video-wrapper {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid transparent;
+        }
+        
+        video, canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #bdc3c7;
+            text-align: center;
+            word-break: keep-all;
+            height: 20px;
+        }
+
+        /* 추가된 얼굴 등록 패널 스타일 (기존 테마에 맞춤) */
+        .registration-panel {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .registration-panel.active {
+            display: flex;
+        }
+        .registration-panel input {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #7f8c8d;
+            background-color: #2c3e50;
+            color: white;
+            font-size: 14px;
+        }
+        .registration-panel button.submit {
+            background-color: var(--success-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="mobile-container">
+    <div class="menu-bar">
+        <button id="startBtn" disabled>카메라 켜기</button>
+        <button id="switchBtn" disabled>전/후면 전환</button>
+        <button id="stopBtn" disabled class="danger">끄기</button>
+    </div>
+    
+    <div class="video-wrapper" id="videoWrapper">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <!-- 하단 메뉴: 차선 방지 대신 등록 버튼으로 교체 -->
+    <div class="menu-bar bottom">
+        <button id="faceToggleBtn" class="active">얼굴 추적 (ON)</button>
+        <button id="registerToggleBtn">얼굴 등록 (0/20)</button>
+    </div>
+
+    <!-- 얼굴 등록 패널 -->
+    <div id="registerPanel" class="registration-panel">
+        <input type="text" id="personName" placeholder="이름을 입력하세요">
+        <input type="file" id="personImage" accept="image/*">
+        <button class="submit" onclick="registerFace()">해당 사진으로 이름 등록하기</button>
+    </div>
+
+    <div id="status">인공지능 모델을 불러오는 중입니다...</div>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const switchBtn = document.getElementById('switchBtn');
+    const faceToggleBtn = document.getElementById('faceToggleBtn');
+    const registerToggleBtn = document.getElementById('registerToggleBtn');
+    const registerPanel = document.getElementById('registerPanel');
+    const statusText = document.getElementById('status');
+    
+    let stream = null;
+    let mainInterval = null;
+    let currentFacingMode = "user"; // 기본값을 전면 카메라로 변경 (얼굴 인식용)
+
+    let isFaceTrackingOn = true;
+    
+    // 얼굴 등록 관련 변수
+    let labeledDescriptors = [];
+    let faceMatcher = null;
+    const MAX_PEOPLE = 20;
+
+    // 사용자가 입력한 모델 URL 유지
+    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+
+    // 1. 모델 로드 (인식 기능까지 수행하기 위해 3가지 모델 로드)
+    async function initModels() {
+        try {
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL), // 빠른 검출
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL), // 특징점
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL) // 매칭
+            ]);
+            statusText.innerText = "시스템 준비 완료! 카메라를 켜주세요.";
+            startBtn.disabled = false;
+        } catch (error) {
+            console.error(error);
+            statusText.innerText = "모델 로드 실패. 인터넷을 확인해주세요.";
+        }
+    }
+
+    // 2. 카메라 시작 함수 (원본 로직 완벽 유지)
+    async function startCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
+            });
+            video.srcObject = stream;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            switchBtn.disabled = false;
+            statusText.innerText = currentFacingMode === 'user' ? "전면 카메라 작동 중" : "후면 카메라 작동 중";
+        } catch (err) {
+            statusText.innerText = "카메라 권한이 차단되었거나 기기를 찾을 수 없습니다.";
+        }
+    }
+
+    startBtn.addEventListener('click', startCamera);
+
+    // 3. 카메라 전/후면 전환 (원본 로직 유지)
+    switchBtn.addEventListener('click', () => {
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        startCamera();
+    });
+
+    // 4. 카메라 끄기 (원본 로직 유지)
+    stopBtn.addEventListener('click', () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        clearInterval(mainInterval);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        switchBtn.disabled = true;
+        statusText.innerText = "카메라 종료됨.";
+    });
+
+    // 5. 패널 및 기능 토글
+    faceToggleBtn.addEventListener('click', () => {
+        isFaceTrackingOn = !isFaceTrackingOn;
+        faceToggleBtn.innerText = `얼굴 추적 (${isFaceTrackingOn ? 'ON' : 'OFF'})`;
+        faceToggleBtn.classList.toggle('active', isFaceTrackingOn);
+    });
+
+    registerToggleBtn.addEventListener('click', () => {
+        registerPanel.classList.toggle('active');
+        registerToggleBtn.classList.toggle('active');
+    });
+
+    // 6. 얼굴 등록 기능 (최대 20명)
+    async function registerFace() {
+        const nameInput = document.getElementById('personName').value.trim();
+        const fileInput = document.getElementById('personImage').files[0];
+
+        if (!nameInput || !fileInput) {
+            alert("이름과 사진을 모두 선택해주세요.");
+            return;
+        }
+
+        let existing = labeledDescriptors.find(ld => ld.label === nameInput);
+        if (!existing && labeledDescriptors.length >= MAX_PEOPLE) {
+            alert(`최대 등록 인원(${MAX_PEOPLE}명)을 초과했습니다.`);
+            return;
+        }
+
+        statusText.innerText = `${nameInput} 분석 중... 잠시만 기다려주세요.`;
+
+        try {
+            const img = await faceapi.bufferToImage(fileInput);
+            // tinyFaceDetector를 이용한 등록 (실시간 영상과 모델 일치화)
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                                           .withFaceLandmarks()
+                                           .withFaceDescriptor();
+
+            if (!detection) {
+                alert("사진에서 얼굴을 찾지 못했습니다. 다른 사진을 시도해주세요.");
+                statusText.innerText = "얼굴 등록 실패";
+                return;
+            }
+
+            if (existing) {
+                existing.descriptors.push(detection.descriptor);
+            } else {
+                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(nameInput, [detection.descriptor]));
+            }
+
+            // 매칭 감도 조절 (0.6 미만일수록 엄격함)
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
+
+            statusText.innerText = `${nameInput} 등록 완료!`;
+            registerToggleBtn.innerText = `얼굴 등록 (${labeledDescriptors.length}/${MAX_PEOPLE})`;
+            document.getElementById('personName').value = '';
+            document.getElementById('personImage').value = '';
+            registerPanel.classList.remove('active');
+            registerToggleBtn.classList.remove('active');
+        } catch (e) {
+            console.error(e);
+            statusText.innerText = "등록 중 오류가 발생했습니다.";
+        }
+    }
+
+    // 7. 메인 프로세싱 루프 (비디오 재생 시 실행 - 인식 및 렌더링)
+    video.addEventListener('play', () => {
+        const displaySize = { width: video.clientWidth, height: video.clientHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        mainInterval = setInterval(async () => {
+            if (video.paused || video.ended) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (isFaceTrackingOn) {
+                // 실시간 얼굴 및 특징점 추출
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                                                .withFaceLandmarks()
+                                                .withFaceDescriptors();
+                                                
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                resizedDetections.forEach(detection => {
+                    const box = detection.detection.box;
+                    let label = "알 수 없음 (Unknown)";
+
+                    // 등록된 인물이 있으면 매칭 확인
+                    if (faceMatcher) {
+                        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                        label = bestMatch.toString();
+                    }
+
+                    // 커스텀 박스와 텍스트 렌더링 (원하는 색상과 디자인)
+                    ctx.strokeStyle = 'var(--box-color)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.roundRect(box.x, box.y, box.width, box.height, 8);
+                    ctx.stroke();
+
+                    // 이름 라벨 배경 및 텍스트
+                    ctx.fillStyle = 'var(--box-color)';
+                    ctx.fillRect(box.x, box.y - 30, box.width, 30);
+                    ctx.fillStyle = '#1e272e';
+                    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+                    ctx.fillText(label, box.x + 5, box.y - 10);
+                });
+            }
+        }, 150); // 150ms 단위 갱신 (모바일 발열 및 성능 최적화)
+    });
+
+    window.addEventListener('resize', () => {
+        if (video.srcObject) {
+            faceapi.matchDimensions(canvas, { width: video.clientWidth, height: video.clientHeight });
+        }
+    });
+
+    initModels();
+</script>
+</body>
+</html>
