@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>다중 모드 오목 (Gomoku)</title>
+    <style>
+        :root {
+            --bg-color: #f4f1ea;
+            --board-color: #e6c280;
+            --line-color: #8b5a2b;
+            --menu-bg: #ffffff;
+            --text-color: #333333;
+            --btn-bg: #6b8e23;
+            --btn-hover: #556b2f;
+            
+            /* 플레이어 색상 */
+            --p1-color: #2c2c2c; /* 흑 */
+            --p2-color: #f9f9f9; /* 백 */
+            --p3-color: #c9643b; /* 적 */
+            --p4-color: #3498db; /* 청 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+            align-items: center;
+        }
+
+        /* 얇은 그림자 느낌의 그라데이션 테두리 */
+        .board-frame {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1 / 1;
+            background: linear-gradient(145deg, rgba(40,40,40,0.5), rgba(0,0,0,0.05));
+            padding: 2px;
+            border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); 
+        }
+
+        .board-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: var(--board-color);
+            border-radius: 4px;
+            overflow: hidden;
+            transition: background-color 0.3s ease;
+        }
+
+        /* 배경 이미지 레이어 */
+        .board-bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            display: none; 
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 메뉴 패널 가로 배열 */
+        .menu-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap; 
+            gap: 15px;
+            background-color: transparent;
+        }
+
+        /* 각 항목별 그룹 블록 */
+        .setting-group {
+            flex: 1 1 230px; 
+            background-color: var(--menu-bg);
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .group-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 6px;
+            margin-bottom: 4px;
+        }
+
+        /* 독립 버튼 UI */
+        .mode-selection, .control-selection {
+            display: flex;
+            gap: 6px;
+        }
+        .mode-btn {
+            flex: 1;
+            background-color: #f0f0f0;
+            color: #555;
+            border: 1px solid #ddd;
+            padding: 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        .mode-btn:hover { background-color: #e0e0e0; }
+        .mode-btn.active {
+            background-color: var(--btn-bg);
+            color: white;
+            border-color: var(--btn-bg);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px 4px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+        .color-btn { background-color: #e67e22; }
+        .color-btn:hover { background-color: #d35400; }
+        .photo-btn { background-color: #2980b9; }
+        .photo-btn:hover { background-color: #2471a3; }
+        .reset-btn { background-color: #95a5a6; }
+        .reset-btn:hover { background-color: #7f8c8d; }
+        .undo-btn { background-color: #95a5a6; }
+        .undo-btn:hover { background-color: #7f8c8d; }
+        .undo-btn:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .restart-btn { background-color: #e74c3c; }
+        .restart-btn:hover { background-color: #c0392b; }
+
+        select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            outline: none;
+            background-color: #fff;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--btn-bg);
+        }
+
+        .status-box {
+            background: var(--bg-color);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 15px;
+            border: 2px solid transparent;
+            transition: 0.3s ease;
+        }
+
+        .players-wrap {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #444;
+        }
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.3s;
+        }
+        .stone-indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+        .p1 { background-color: var(--p1-color); }
+        .p2 { background-color: var(--p2-color); }
+        .p3 { background-color: var(--p3-color); }
+        .p4 { background-color: var(--p4-color); }
+
+        /* 사용자 정의 스크롤 바 */
+        .custom-scroll {
+            overflow-y: scroll !important; 
+            padding-right: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 16px; 
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #eaeaea; 
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #7f8c8d; 
+            border-radius: 8px;
+            border: 3px solid #eaeaea; 
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #2c3e50; 
+        }
+
+        /* 이미지 썸네일 리스트 */
+        .thumbnail-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 320px;
+            margin-top: 8px;
+            border: 2px solid #ddd;
+            padding: 10px;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .thumbnail-list img {
+            width: 100%;
+            height: 280px; 
+            object-fit: cover;
+            border-radius: 6px;
+            border: 4px solid transparent;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0; 
+        }
+        .thumbnail-list img.active {
+            border-color: #e74c3c; 
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.8);
+        }
+
+        /* 음악 플레이어 컨트롤 */
+        .player-controls { display: flex; gap: 5px; }
+        .small-btn, .icon-btn {
+            background-color: #8e44ad;
+            padding: 8px;
+            font-size: 13px;
+            flex: 1;
+            border-radius: 4px;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .small-btn:hover, .icon-btn:hover { background-color: #9b59b6; }
+        .current-track {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .playlist {
+            list-style: none;
+            max-height: 100px;
+            font-size: 12px;
+            background: #fff;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            padding: 4px;
+            margin: 0;
+        }
+        .playlist li {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #555;
+        }
+        .playlist li:hover { background-color: #f0f0f0; }
+        .playlist li.active {
+            font-weight: bold;
+            color: #8e44ad;
+            background-color: #f4e8fa;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <!-- 오목 보드 (얇은 그림자 테두리 프레임) -->
+    <div class="board-frame">
+        <div class="board-wrapper" id="boardWrapper">
+            <!-- 배경 이미지 레이어 -->
+            <img id="boardBgImage" class="board-bg-image" alt="Board Background">
+            <canvas id="omokCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 하단 메뉴 패널 -->
+    <div class="menu-panel">
+        
+        <!-- 블록 1: 게임 제어 -->
+        <div class="setting-group">
+            <div class="group-title">🎮 게임 모드 및 제어</div>
+            
+            <div class="mode-selection">
+                <button class="mode-btn" id="btnMode1" onclick="selectMode(1)">🧑 1인</button>
+                <!-- 최초 기본값인 2인용에 active 클래스 부여 -->
+                <button class="mode-btn active" id="btnMode2" onclick="selectMode(2)">🧑‍🤝‍🧑 2인</button>
+                <button class="mode-btn" id="btnMode3" onclick="selectMode(3)">👨‍👦‍👦 3인</button>
+                <button class="mode-btn" id="btnMode4" onclick="selectMode(4)">👨‍👩‍👧‍👦 4인</button>
+            </div>
+            
+            <div class="control-selection">
+                <button id="undoBtn" onclick="undo()" class="action-btn undo-btn">↩️ 무르기</button>
+                <button onclick="initGame()" class="action-btn restart-btn">🔄 다시 시작</button>
+            </div>
+            
+            <div id="difficultyGroup" style="display: none; flex-direction: column; gap: 4px; margin-top: 4px;">
+                <label for="aiDifficulty" style="font-size: 13px; font-weight: bold; color: #555;">🤖 AI 난이도 (1~7단계)</label>
+                <select id="aiDifficulty" onchange="saveSettings(); initGame();">
+                    <option value="1">1단계 (입문)</option>
+                    <option value="2">2단계</option>
+                    <option value="3">3단계</option>
+                    <option value="4" selected>4단계 (보통)</option>
+                    <option value="5">5단계</option>
+                    <option value="6">6단계</option>
+                    <option value="7">7단계 (완벽함)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 블록 2: 상태 및 보드 디자인 -->
+        <div class="setting-group">
+            <div class="group-title">🎨 보드 디자인 및 효과음</div>
+            
+            <div class="control-selection">
+                <button class="action-btn color-btn" onclick="document.getElementById('bgColorPicker').click()">🎨 배경색</button>
+                <input type="color" id="bgColorPicker" style="display:none;" onchange="changeBgColor(this.value)">
+                
+                <button class="action-btn photo-btn" onclick="document.getElementById('bgImgInput').click()">🖼️ 사진배경</button>
+                <input type="file" id="bgImgInput" accept="image/*" multiple style="display:none;" onchange="handleBgImageSelect(event)">
+                
+                <!-- 원래대로 버튼 -->
+                <button class="action-btn reset-btn" onclick="resetBoardDesign()">🔄 원래대로</button>
+            </div>
+
+            <!-- 스크롤 바가 명확하게 나오는 썸네일 리스트 -->
+            <div id="previewContainer" style="display: none;">
+                <div id="bgThumbnailList" class="thumbnail-list custom-scroll"></div>
+            </div>
+
+            <div style="margin-top: 4px;">
+                <label for="bgOpacity" style="font-size: 13px; font-weight: bold; color: #555;">사진 투명도 (선명함 조절)</label>
+                <input type="range" id="bgOpacity" min="0" max="1" step="0.05" value="0.3" oninput="changeBgOpacity(this.value)">
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 5px; border-top: 1px solid #eee;">
+                <label for="sfxVolume" style="font-size: 13px; font-weight: bold; color: #555;">🔊 돌 효과음 조절 (0~10)</label>
+                <input type="range" id="sfxVolume" min="0" max="10" step="0.5" value="5.0" onchange="saveSettings()">
+            </div>
+        </div>
+
+        <!-- 블록 3: 음악 플레이어 및 턴 상태 -->
+        <div class="setting-group">
+            <div class="group-title">🎵 기기 음악 및 진행 상태</div>
+            
+            <input type="file" id="audioInput" multiple accept="audio/*" style="display:none" onchange="handleAudioSelect(event)">
+            <button class="small-btn" onclick="document.getElementById('audioInput').click()">📁 기기 내 MP3 파일 선택</button>
+            
+            <div class="player-controls">
+                <button class="icon-btn" onclick="pauseTrack()">⏯ 재생/정지</button>
+                <button class="icon-btn" onclick="playNext()">⏭ 다음 곡</button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                    <input type="checkbox" id="autoPlayCheckbox" checked onchange="saveSettings()"> 첫 돌 자동재생
+                </label>
+                <label style="font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                    <input type="checkbox" id="loopCheckbox" checked onchange="saveSettings()"> 전체 반복
+                </label>
+            </div>
+            
+            <div class="status-box" id="turnStatus" style="margin-top: 5px;">게임 준비 중...</div>
+            <div class="players-wrap" style="margin-top: 5px;">
+                <div class="player-info" id="p1-info"><span class="stone-indicator p1"></span> 1P(흑)</div>
+                <div class="player-info" id="p2-info"><span class="stone-indicator p2"></span> 2P(백)</div>
+                <div class="player-info" id="p3-info"><span class="stone-indicator p3"></span> 3P(적)</div>
+                <div class="player-info" id="p4-info"><span class="stone-indicator p4"></span> 4P(청)</div>
+            </div>
+            
+            <div class="current-track" id="currentTrackName" style="margin-top: 5px;">음악이 없습니다.</div>
+            <ul class="playlist custom-scroll" id="playlistUI"></ul>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 0. 자동 저장 기능 (LocalStorage)
+    // ==========================================
+    let selectedMode = 2; // 초기 기본값을 2인용으로 설정
+    let currentBgIdx = 0; 
+
+    function saveSettings() {
+        const settings = {
+            mode: selectedMode,
+            difficulty: document.getElementById('aiDifficulty').value,
+            sfxVol: document.getElementById('sfxVolume').value,
+            bgColor: document.getElementById('bgColorPicker').value,
+            bgOpacity: document.getElementById('bgOpacity').value,
+            autoPlay: document.getElementById('autoPlayCheckbox').checked,
+            loop: document.getElementById('loopCheckbox').checked,
+            bgIdx: currentBgIdx
+        };
+        localStorage.setItem('gomoku_settings', JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('gomoku_settings');
+        if (saved) {
+            const s = JSON.parse(saved);
+            
+            selectedMode = s.mode || 2; // 저장된 값이 없을 경우를 대비해 2인용을 기본으로
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById('btnMode' + selectedMode);
+            if (activeBtn) activeBtn.classList.add('active');
+            
+            document.getElementById('aiDifficulty').value = s.difficulty || 4;
+            document.getElementById('sfxVolume').value = s.sfxVol !== undefined ? s.sfxVol : 5.0;
+            
+            document.getElementById('bgColorPicker').value = s.bgColor || '#e6c280';
+            document.documentElement.style.setProperty('--board-color', s.bgColor || '#e6c280');
+            
+            const opacity = s.bgOpacity !== undefined ? s.bgOpacity : 0.3;
+            document.getElementById('bgOpacity').value = opacity;
+            document.getElementById('boardBgImage').style.opacity = opacity;
+            
+            document.getElementById('autoPlayCheckbox').checked = s.autoPlay !== undefined ? s.autoPlay : true;
+            document.getElementById('loopCheckbox').checked = s.loop !== undefined ? s.loop : true;
+            
+            currentBgIdx = s.bgIdx !== undefined ? s.bgIdx : 0;
+        } else {
+            // 저장된 설정이 전혀 없는 최초 접속 시 2인용 모드로 초기 세팅
+            selectedMode = 2;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btnMode2').classList.add('active');
+        }
+    }
+
+    function selectMode(mode) {
+        selectedMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btnMode' + mode).classList.add('active');
+        saveSettings();
+        initGame();
+    }
+
+    function changeBgColor(val) {
+        document.documentElement.style.setProperty('--board-color', val);
+        saveSettings();
+    }
+
+    function changeBgOpacity(val) {
+        document.getElementById('boardBgImage').style.opacity = val;
+        saveSettings();
+    }
+
+    // 보드 디자인 초기화 (원래대로 버튼)
+    function resetBoardDesign() {
+        if (!db) return;
+        const tx = db.transaction('images', 'readwrite');
+        tx.objectStore('images').clear();
+        tx.oncomplete = () => {
+            document.getElementById('bgImgInput').value = '';
+            document.getElementById('boardBgImage').style.display = 'none';
+            document.getElementById('boardBgImage').src = '';
+            
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('bgThumbnailList').innerHTML = '';
+            bgImageList = [];
+            currentBgIdx = 0;
+            
+            document.getElementById('bgColorPicker').value = '#e6c280';
+            document.documentElement.style.setProperty('--board-color', '#e6c280');
+            
+            document.getElementById('bgOpacity').value = 0.3;
+            document.getElementById('boardBgImage').style.opacity = 0.3;
+            
+            saveSettings();
+        };
+    }
+
+    // ==========================================
+    // 1. IndexedDB 설정 (음악 & 배경 이미지 다중 관리)
+    // ==========================================
+    const dbName = 'GomokuDataDB';
+    let db;
+    let playlist = [];
+    let bgImageList = [];
+    let currentTrackIdx = 0;
+    const bgmAudio = new Audio();
+    bgmAudio.volume = 0.4; 
+
+    bgmAudio.addEventListener('ended', () => { playNext(); });
+
+    const request = indexedDB.open(dbName, 1);
+    request.onupgradeneeded = function(e) {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains('tracks')) {
+            db.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('images')) {
+            db.createObjectStore('images', { keyPath: 'id' });
+        }
+    };
+    request.onsuccess = function(e) {
+        db = e.target.result;
+        loadDataFromDB(); 
+    };
+
+    function handleAudioSelect(e) {
+        const files = Array.from(e.target.files);
+        if(files.length === 0) return;
+        
+        files.sort((a, b) => b.lastModified - a.lastModified);
+
+        const tx = db.transaction('tracks', 'readwrite');
+        const store = tx.objectStore('tracks');
+        store.clear(); 
+        files.forEach(file => { store.add({ name: file.name, data: file }); });
+        tx.oncomplete = () => { loadDataFromDB(); };
+    }
+
+    function handleBgImageSelect(e) {
+        const files = Array.from(e.target.files);
+        if(files.length === 0) return;
+
+        files.sort((a, b) => b.lastModified - a.lastModified);
+
+        const tx = db.transaction('images', 'readwrite');
+        const store = tx.objectStore('images');
+        store.clear(); 
+        
+        files.forEach((file, idx) => { 
+            store.put({ id: 'bg_' + idx, name: file.name, data: file }); 
+        });
+        
+        tx.oncomplete = () => { 
+            currentBgIdx = 0; 
+            loadDataFromDB(); 
+        };
+    }
+
+    function loadDataFromDB() {
+        const tx = db.transaction(['tracks', 'images'], 'readonly');
+        
+        // 음악 로드
+        const reqTracks = tx.objectStore('tracks').getAll();
+        reqTracks.onsuccess = function() {
+            playlist = reqTracks.result;
+            if(playlist.length > 0) { 
+                document.getElementById('currentTrackName').innerText = "대기 중: " + playlist[0].name;
+            }
+            renderPlaylistUI();
+        };
+
+        // 이미지 로드
+        const reqImg = tx.objectStore('images').getAll();
+        reqImg.onsuccess = function() {
+            bgImageList = reqImg.result || [];
+            renderBgThumbnailList();
+            
+            if(bgImageList.length > 0) {
+                if(currentBgIdx >= bgImageList.length) currentBgIdx = 0;
+                applyBgImage(currentBgIdx);
+            } else {
+                document.getElementById('boardBgImage').style.display = 'none';
+                document.getElementById('previewContainer').style.display = 'none';
+            }
+        };
+    }
+
+    function renderBgThumbnailList() {
+        const listContainer = document.getElementById('bgThumbnailList');
+        listContainer.innerHTML = '';
+        
+        if(bgImageList.length === 0) {
+            document.getElementById('previewContainer').style.display = 'none';
+            return;
+        }
+        document.getElementById('previewContainer').style.display = 'block';
+
+        bgImageList.forEach((imgObj, idx) => {
+            const imgUrl = URL.createObjectURL(imgObj.data);
+            const imgEl = document.createElement('img');
+            imgEl.src = imgUrl;
+            if(idx === currentBgIdx) imgEl.classList.add('active');
+            
+            imgEl.onclick = () => { applyBgImage(idx); };
+            listContainer.appendChild(imgEl);
+        });
+    }
+
+    function applyBgImage(idx) {
+        if(bgImageList.length === 0) return;
+        currentBgIdx = idx;
+        const imgObj = bgImageList[idx];
+        const imgUrl = URL.createObjectURL(imgObj.data);
+        
+        document.getElementById('boardBgImage').src = imgUrl;
+        document.getElementById('boardBgImage').style.display = 'block';
+
+        const listContainer = document.getElementById('bgThumbnailList');
+        Array.from(listContainer.children).forEach((el, i) => {
+            if(i === idx) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+
+        saveSettings(); 
+    }
+
+    function renderPlaylistUI() {
+        const plUI = document.getElementById('playlistUI');
+        plUI.innerHTML = '';
+        playlist.forEach((track, index) => {
+            const li = document.createElement('li');
+            li.innerText = track.name;
+            if (index === currentTrackIdx && !bgmAudio.paused) li.classList.add('active');
+            li.onclick = () => playTrack(index);
+            plUI.appendChild(li);
+        });
+    }
+
+    function playTrack(index) {
+        if(playlist.length === 0) return;
+        currentTrackIdx = index;
+        const track = playlist[index];
+        const blobUrl = URL.createObjectURL(track.data);
+        bgmAudio.src = blobUrl;
+        bgmAudio.play().then(() => {
+            document.getElementById('currentTrackName').innerText = "🎵 재생 중: " + track.name;
+            renderPlaylistUI();
+        }).catch(err => console.error(err));
+    }
+
+    function pauseTrack() {
+        if(playlist.length === 0) return;
+        if(!bgmAudio.paused) {
+            bgmAudio.pause();
+            document.getElementById('currentTrackName').innerText = "⏸ 일시정지됨: " + playlist[currentTrackIdx].name;
+            renderPlaylistUI();
+        } else {
+            if(!bgmAudio.src) playTrack(currentTrackIdx);
+            else {
+                bgmAudio.play();
+                document.getElementById('currentTrackName').innerText = "🎵 재생 중: " + playlist[currentTrackIdx].name;
+                renderPlaylistUI();
+            }
+        }
+    }
+
+    function playNext() {
+        if(playlist.length === 0) return;
+        currentTrackIdx++;
+        const isLoop = document.getElementById('loopCheckbox').checked;
+        if(currentTrackIdx >= playlist.length) {
+            if(isLoop) currentTrackIdx = 0; 
+            else {
+                currentTrackIdx = playlist.length - 1;
+                bgmAudio.pause();
+                document.getElementById('currentTrackName').innerText = "⏹ 재생 완료";
+                renderPlaylistUI();
+                return;
+            }
+        }
+        playTrack(currentTrackIdx);
+    }
+
+    // ==========================================
+    // 2. 오목 로직 및 돌 효과음 (Web Audio API)
+    // ==========================================
+    const canvas = document.getElementById('omokCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusBox = document.getElementById('turnStatus');
+    const undoBtn = document.getElementById('undoBtn');
+    const difficultyGroup = document.getElementById('difficultyGroup');
+
+    const BOARD_SIZE = 19;
+    let board = [];
+    let history = [];
+    let currentPlayer = 1;
+    let gameActive = true;
+    let totalPlayers = 2; // 초기값도 가급적 2로 맞춤
+    let isVsAi = false;
+    let aiThinking = false;
+    
+    let cellSize = 0;
+    let margin = 0;
+    let winningStones = [];
+    let ripples = []; 
+    let animationId = null;
+
+    const colors = { 1: '#2c2c2c', 2: '#f9f9f9', 3: '#c9643b', 4: '#3498db' };
+    const playerNames = { 1: '1P (흑돌)', 2: '2P (백돌)', 3: '3P (적돌)', 4: '4P (청돌)' };
+
+    let audioCtx = null;
+    function initAudioContext() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playStoneSound(playerIndex) {
+        initAudioContext();
+        if (!audioCtx) return;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        let startFreq, endFreq, vol, type;
+
+        const sfxMultiplier = parseFloat(document.getElementById('sfxVolume').value);
+
+        if (playerIndex === 1) {
+            type = 'triangle'; startFreq = 300; endFreq = 100; vol = 0.6 * sfxMultiplier;
+        } else if (playerIndex === 2) {
+            type = 'sine'; startFreq = 800; endFreq = 300; vol = 0.4 * sfxMultiplier;
+        } else if (playerIndex === 3) {
+            type = 'square'; startFreq = 500; endFreq = 200; vol = 0.15 * sfxMultiplier; 
+        } else {
+            type = 'sawtooth'; startFreq = 700; endFreq = 150; vol = 0.2 * sfxMultiplier;
+        }
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = 1500;
+        osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    }
+
+    function initGame() {
+        const mode = selectedMode;
+        if (mode === 1) { 
+            totalPlayers = 2; isVsAi = true; playerNames[2] = '🤖 컴퓨터(백)'; 
+            difficultyGroup.style.display = 'flex';
+        } else if (mode === 2) { 
+            totalPlayers = 2; isVsAi = false; playerNames[2] = '2P (백돌)'; 
+            difficultyGroup.style.display = 'none';
+        } else if (mode === 3) { 
+            totalPlayers = 3; isVsAi = false; playerNames[2] = '2P (백돌)'; 
+            difficultyGroup.style.display = 'none';
+        } else {
+            totalPlayers = 4; isVsAi = false; playerNames[2] = '2P (백돌)'; 
+            difficultyGroup.style.display = 'none';
+        }
+
+        document.getElementById('p3-info').style.opacity = (totalPlayers >= 3) ? '1' : '0.3';
+        document.getElementById('p4-info').style.opacity = (totalPlayers === 4) ? '1' : '0.3';
+
+        board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+        history = []; winningStones = []; ripples = [];
+        currentPlayer = 1; gameActive = true; aiThinking = false;
+        
+        if (!animationId) renderLoop();
+        updateStatus(); resizeAndDraw();
+    }
+
+    function resizeAndDraw() {
+        const wrapper = canvas.parentElement;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = wrapper.clientWidth * dpr;
+        canvas.height = wrapper.clientHeight * dpr;
+        ctx.scale(dpr, dpr);
+        const minDim = Math.min(wrapper.clientWidth, wrapper.clientHeight);
+        margin = minDim * 0.05;
+        cellSize = (minDim - (margin * 2)) / (BOARD_SIZE - 1);
+    }
+
+    function renderLoop() {
+        ctx.clearRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+        
+        ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 1;
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            ctx.beginPath(); ctx.moveTo(margin, margin + i * cellSize); ctx.lineTo(margin + (BOARD_SIZE - 1) * cellSize, margin + i * cellSize); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(margin + i * cellSize, margin); ctx.lineTo(margin + i * cellSize, margin + (BOARD_SIZE - 1) * cellSize); ctx.stroke();
+        }
+
+        const starPoints = [3, 9, 15];
+        ctx.fillStyle = '#8b5a2b';
+        starPoints.forEach(x => {
+            starPoints.forEach(y => {
+                ctx.beginPath(); ctx.arc(margin + x * cellSize, margin + y * cellSize, 4, 0, Math.PI * 2); ctx.fill();
+            });
+        });
+
+        const time = Date.now();
+        const breathAlpha = (Math.sin(time / 200) + 1) / 2 * 0.7 + 0.3;
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                if (board[y][x] !== 0) {
+                    const isWinningStone = winningStones.some(s => s.x === x && s.y === y);
+                    if (isWinningStone) {
+                        ctx.globalAlpha = breathAlpha; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 15;
+                    } else {
+                        ctx.globalAlpha = 1.0; ctx.shadowColor = 'rgba(0, 0, 0, 0.4)'; ctx.shadowBlur = 4;
+                    }
+                    drawStone(x, y, board[y][x]);
+                    ctx.globalAlpha = 1.0; ctx.shadowColor = 'transparent';
+                }
+            }
+        }
+
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            let r = ripples[i];
+            ctx.beginPath(); ctx.arc(margin + r.x * cellSize, margin + r.y * cellSize, r.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(135, 206, 235, ${r.alpha})`; ctx.lineWidth = 2.5; ctx.stroke();
+            r.radius += 1.5; r.alpha -= 0.03; 
+            if (r.alpha <= 0) ripples.splice(i, 1);
+        }
+
+        animationId = requestAnimationFrame(renderLoop);
+    }
+
+    function drawStone(x, y, playerIndex) {
+        const posX = margin + x * cellSize, posY = margin + y * cellSize;
+        ctx.beginPath(); ctx.arc(posX, posY, cellSize * 0.45, 0, Math.PI * 2);
+        const gradient = ctx.createRadialGradient(posX - cellSize * 0.15, posY - cellSize * 0.15, cellSize * 0.05, posX, posY, cellSize * 0.45);
+        
+        if (playerIndex === 1) { gradient.addColorStop(0, '#555'); gradient.addColorStop(1, '#111'); } 
+        else if (playerIndex === 2) { gradient.addColorStop(0, '#fff'); gradient.addColorStop(1, '#ddd'); } 
+        else if (playerIndex === 3) { gradient.addColorStop(0, '#e58e69'); gradient.addColorStop(1, '#a64a25'); }
+        else { gradient.addColorStop(0, '#5dade2'); gradient.addColorStop(1, '#2874a6'); } 
+        
+        ctx.fillStyle = gradient; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2; ctx.fill();
+    }
+
+    canvas.addEventListener('click', (e) => {
+        if (!gameActive || aiThinking) return;
+        initAudioContext(); 
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
+        const gridX = Math.round((clickX - margin) / cellSize), gridY = Math.round((clickY - margin) / cellSize);
+        if (gridX >= 0 && gridX < BOARD_SIZE && gridY >= 0 && gridY < BOARD_SIZE) {
+            if (board[gridY][gridX] === 0) placeStone(gridX, gridY);
+        }
+    });
+
+    function placeStone(x, y) {
+        board[y][x] = currentPlayer;
+        history.push({ x, y, player: currentPlayer });
+        playStoneSound(currentPlayer); 
+        ripples.push({x: x, y: y, radius: cellSize * 0.5, alpha: 0.8});
+
+        const autoPlayChecked = document.getElementById('autoPlayCheckbox').checked;
+        if (history.length === 1 && autoPlayChecked && playlist.length > 0) {
+            if (bgmAudio.paused) {
+                if (!bgmAudio.src) playTrack(currentTrackIdx);
+                else bgmAudio.play().catch(e => console.error(e));
+            }
+        }
+
+        const winStones = checkWin(x, y, currentPlayer);
+        if (winStones) {
+            winningStones = winStones;
+            statusBox.innerHTML = `🎉 ${playerNames[currentPlayer]} 승리!`;
+            statusBox.style.color = colors[currentPlayer];
+            if (currentPlayer === 2) statusBox.style.color = '#333'; 
+            gameActive = false; return;
+        }
+
+        currentPlayer = (currentPlayer % totalPlayers) + 1;
+        updateStatus();
+
+        if (gameActive && isVsAi && currentPlayer === 2) {
+            aiThinking = true;
+            statusBox.innerHTML = `🤖 컴퓨터가 생각 중입니다...`;
+            setTimeout(makeAiMove, 500); 
+        }
+    }
+
+    function makeAiMove() {
+        if (!gameActive) return;
+        let difficulty = parseInt(document.getElementById('aiDifficulty').value); 
+        let bestScore = -Infinity; let bestMoves = [];
+        let randomWeight = (7 - difficulty) * 8000; 
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                if (board[y][x] === 0) {
+                    let attackScore = evaluatePosition(x, y, 2); 
+                    let defenseScore = evaluatePosition(x, y, 1); 
+                    let totalScore = attackScore + defenseScore * 1.5; 
+                    
+                    if (difficulty < 7) {
+                        totalScore += Math.random() * randomWeight;
+                    }
+                    
+                    if (totalScore > bestScore) { bestScore = totalScore; bestMoves = [{x, y}]; } 
+                    else if (Math.abs(totalScore - bestScore) < 1) { bestMoves.push({x, y}); }
+                }
+            }
+        }
+        let move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        if (history.length === 1 && move.x === 0 && move.y === 0) {
+            move = { x: history[0].x + (Math.random() > 0.5 ? 1 : -1), y: history[0].y + (Math.random() > 0.5 ? 1 : -1) };
+        }
+        aiThinking = false; placeStone(move.x, move.y);
+    }
+
+    function evaluatePosition(x, y, player) {
+        let score = 0; const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+        for (let [dx, dy] of directions) {
+            let count = 1; let openEnds = 0;
+            for (let step of [1, -1]) {
+                let nx = x + dx * step, ny = y + dy * step, space = 0;
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                    if (board[ny][nx] === player) count++;
+                    else if (board[ny][nx] === 0) { if (space === 0) openEnds++; break; } 
+                    else break; 
+                    nx += dx * step; ny += dy * step;
+                }
+            }
+            if (count >= 5) score += 2000000; 
+            else if (count === 4 && openEnds === 2) score += 100000; 
+            else if (count === 4 && openEnds === 1) score += 50000; 
+            else if (count === 3 && openEnds === 2) score += 10000; 
+            else if (count === 3 && openEnds === 1) score += 1000;
+            else if (count === 2 && openEnds === 2) score += 500;
+        }
+        return score;
+    }
+
+    function undo() {
+        if (history.length === 0 || !gameActive || aiThinking) return;
+        const lastMove = history.pop(); board[lastMove.y][lastMove.x] = 0;
+        if (isVsAi && lastMove.player === 2 && history.length > 0) {
+            const humanMove = history.pop(); board[humanMove.y][humanMove.x] = 0; currentPlayer = 1;
+        } else currentPlayer = lastMove.player;
+        updateStatus();
+    }
+
+    function updateStatus() {
+        statusBox.innerHTML = `현재 턴: <strong>${playerNames[currentPlayer]}</strong>`;
+        statusBox.style.borderLeft = `6px solid ${colors[currentPlayer]}`;
+        undoBtn.disabled = history.length === 0;
+    }
+
+    function checkWin(x, y, player) {
+        const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+        for (let [dx, dy] of directions) {
+            let count = 1; let stones = [{x, y}];
+            for (let step of [1, -1]) {
+                let nx = x + dx * step, ny = y + dy * step;
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === player) {
+                    count++; stones.push({x: nx, y: ny});
+                    nx += dx * step; ny += dy * step;
+                }
+            }
+            if (count >= 5) return stones;
+        }
+        return null;
+    }
+
+    window.addEventListener('resize', resizeAndDraw);
+    
+    // 시작 시 설정 로딩
+    window.onload = () => {
+        loadSettings();
+        initGame();
+    };
+</script>
+</body>
+</html>
